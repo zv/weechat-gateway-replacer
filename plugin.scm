@@ -25,8 +25,9 @@
     (cons nick msg)))
 
 (define (replace-privmsg msg)
-  "A function to replace the privmsg sent by r2tg"
-  (let ((result (string-match *r2tg-msg-regex* msg)))
+  "A function to replace the privmsg sent by by a gateway "
+
+  (let ((result (regexp-exec *r2tg-msg-regex* msg)))
     (if result
         (let* ([nth-match (cut match:substring result <>)]
                ;; take everything after username before message
@@ -38,16 +39,20 @@
                                         (match:end result 2))
                                      (string-length msg))]
                ;; extract everything before the message but after the username
-               [hostmask (string-copy msg (match:end result 1) (match:start result 2))]
-               ;; actually join our string
-               [new-msg (string-join (list real-username hostmask message) "")])
-          new-msg)
+               [hostmask (string-copy msg (match:end result 1) (match:start result 2))])
+          (string-append ":" real-username hostmask message))
         msg)))
 
-(define (privmsg-modifier data modifier-data server msg)
-  (if (equal? server "freenode") (replace-privmsg msg)
+(define (privmsg-modifier data modifier-type server msg)
+  (if (equal? server "freenode")
+      ;; keep it in a `let' block in case we want to do more processing
+      (let ((new-msg (replace-privmsg msg)))
+        new-msg)
       msg))
 
-;; (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" "")
+(if (defined? 'weechat:hook_modifier)
+    (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" ""))
+
 (define test-msg ":r2tg!~user@static.213-239-215-115.clients.your-server.de PRIVMSG #radare :<Maijin> Just build using ./sys/asan.sh and paste log caused by your issue")
 (define test-nonmsg ":aiju!~aiju@unaffiliated/aiju PRIVMSG #cat-v :branch_: a large part of modern human intelligence is learned through culture :)")
+(define test-zv ":zv-test!43a46046@gateway/web/freenode/ip.67.164.96.70 PRIVMSG #test-channel :<Maijin> adfasfaf")
