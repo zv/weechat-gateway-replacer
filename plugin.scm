@@ -1,49 +1,50 @@
+(use-modules ((srfi srfi-1)
+              #:select (any)))
 (use-modules (srfi srfi-26))
 (use-modules (ice-9 regex))
 
-(weechat:register "r2tg_nickconvert"
-                  "zv <zv@nxvr.org>"
-                  "1.0"
-                  "GPL3"
-                  "A small plugin to convert the names of users of r2tg to their real names"
-                  ""
-                  "")
+(if (defined? 'weechat:register)
+    (begin
+      (weechat:register "gateway-nickconverter"
+                      "zv <zv@nxvr.org>"
+                      "1.0"
+                      "GPL3"
+                      "Convert usernames of gateway connections their real names"
+                      ""
+                      "")
+      (weechat:print "" "Initialize Gateway Nickconverter")))
 
-(weechat:print "" "Initialize r2tg nickconvert")
-
-(define *gateways*
-  '(("#radare" . "r2tg")))
-
-(define *r2tg-msg-regex* ":(r2tg)!~.*?@\\S* PRIVMSG #radare :(<(.*?)>) .*")
-
-
-(define (extract-real-message msg)
-  "Converts a string like '<pancake> adsfadfadfasdf' to a tuple"
-  (let* ([nick-ending (string-index msg #\>)]
-         [nick (substring msg 1 nick-ending)]
-         [msg (substring msg nick-ending (string-length msg))])
-    (cons nick msg)))
+;; A regular expression must have the gateway username in the first matchgroup,
+;; the "real" username in the 3rd, and the real-username along with it's enclosing
+;; brackets in the 2nd
+(define *gateway-regexps*
+  (list
+    (make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(.*?)>) .*")           ; r2tg
+    (make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(.*?)>) .*"))) ; test
 
 (define (replace-privmsg msg)
   "A function to replace the privmsg sent by by a gateway "
-
-  (let ((result (regexp-exec *r2tg-msg-regex* msg)))
+  (let* ((match? (cut regexp-exec <> msg))
+         (result (any match? *gateway-regexps*)))
     (if result
         (let* ([nth-match (cut match:substring result <>)]
+               [start (cut match:start result <>)]
+               [end (cut match:end result <>)]
                ;; take everything after username before message
-               [username (nth-match 1)]
+               [username      (nth-match 1)]
                [real-username (nth-match 3)]
                ;; extract everything after the fake r2tg username
                [message (string-copy msg
-                                     (+ 1 ; skip the inserted space
-                                        (match:end result 2))
+                                     ;; skip the inserted space
+                                     (+ 1 (end 2))
                                      (string-length msg))]
                ;; extract everything before the message but after the username
-               [hostmask (string-copy msg (match:end result 1) (match:start result 2))])
+               [hostmask (string-copy msg (end 1) (start 1))])
           (string-append ":" real-username hostmask message))
         msg)))
 
 (define (privmsg-modifier data modifier-type server msg)
+  ;; everything we want is on freenode right now
   (if (equal? server "freenode")
       ;; keep it in a `let' block in case we want to do more processing
       (let ((new-msg (replace-privmsg msg)))
