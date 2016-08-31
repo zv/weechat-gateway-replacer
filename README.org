@@ -1,0 +1,18 @@
+* Gateway Nick Converter
+Telegram, Slack and other IRC gateways frequently send under single user name that
+with the /true/ username prefixed to the message like so:
+
+#+BEGIN_EXAMPLE
+r2tg | <oddcoder> the shellcoder handbook really goes without any discussion on how to setup the server to exploit it just said (setup up the server)
+#+END_EXAMPLE
+
+This is a weechat plugin that will let you modify the gateway messages with the
+real nick.
+
+#+BEGIN_EXAMPLE
+oddcoder | the shellcoder handbook really goes without any discussion on how to setup the server to exploit it just said (setup up the server)
+#+END_EXAMPLE
+
+** Adding New Nicks
+This plugin doesn't expose any configuration details to weechat, if you'd like
+ to add another gateway<->nick matching pair, you can [[https://github.com/zv/weechat-gateway-replacer/blob/master/plugin.scm#L20-L23][add another regexp here]]
