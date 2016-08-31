@@ -28,18 +28,18 @@
          (result (any match? *gateway-regexps*)))
     (if result
         (let* ([nth-match (cut match:substring result <>)]
-               [start (cut match:start result <>)]
-               [end (cut match:end result <>)]
                ;; take everything after username before message
-               [username      (nth-match 1)]
+               [username (nth-match 1)]
                [real-username (nth-match 3)]
                ;; extract everything after the fake r2tg username
                [message (string-copy msg
                                      ;; skip the inserted space
-                                     (+ 1 (end 2))
+                                     (+ 1 (match:end result 2))
                                      (string-length msg))]
                ;; extract everything before the message but after the username
-               [hostmask (string-copy msg (end 1) (start 1))])
+               [hostmask (string-copy msg
+                                      (match:end result 1)
+                                      (match:start result 2))])
           (string-append ":" real-username hostmask message))
         msg)))
 
