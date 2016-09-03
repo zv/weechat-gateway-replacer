@@ -1,7 +1,9 @@
 (use-modules ((srfi srfi-1)
               #:select (any)))
-(use-modules (srfi srfi-26))
+(use-modules ((srfi srfi-26)
+              #:select (cut)))
 (use-modules (ice-9 regex))
+(use-modules (ice-9 hash-table))
 
 (if (defined? 'weechat:register)
     (begin
@@ -18,14 +20,18 @@
 ;; the "real" username in the 3rd, and the real-username along with it's enclosing
 ;; brackets in the 2nd
 (define *gateway-regexps*
-  (list
-    (make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(.*?)>) .*")           ; r2tg
-    (make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(.*?)>) .*"))) ; test
+  (alist->hash-table
+   `(("freenode" . (;; r2tg
+                    ,(make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(.*?)>) .*")
+                    ;; slack-irc-bot
+                    ,(make-regexp ":(slack-irc-bot)!\\S* PRIVMSG #\\S* :(<(.*?)>) .*")
+                    ;; test
+                    ,(make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(.*?)>) .*"))))))
 
-(define (replace-privmsg msg)
+(define (replace-privmsg msg gateways)
   "A function to replace the privmsg sent by by a gateway "
   (let* ((match? (cut regexp-exec <> msg))
-         (result (any match? *gateway-regexps*)))
+         (result (any match? gateways)))
     (if result
         (let* ([nth-match (cut match:substring result <>)]
                ;; take everything after username before message
@@ -43,17 +49,15 @@
           (string-append ":" real-username hostmask message))
         msg)))
 
+(define (server->gateways server)
+  (hash-ref *gateway-regexps* server))
+
 (define (privmsg-modifier data modifier-type server msg)
-  ;; everything we want is on freenode right now
-  (if (equal? server "freenode")
-      ;; keep it in a `let' block in case we want to do more processing
-      (let ((new-msg (replace-privmsg msg)))
-        new-msg)
-      msg))
+  ;; fetch the appropriate gateway by server
+  (let ((gateways (server->gateways server)))
+    (if gateways
+        (replace-privmsg msg gateways)
+        msg)))
 
 (if (defined? 'weechat:hook_modifier)
     (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" ""))
-
-(define test-msg ":r2tg!~user@static.213-239-215-115.clients.your-server.de PRIVMSG #radare :<Maijin> Just build using ./sys/asan.sh and paste log caused by your issue")
-(define test-nonmsg ":aiju!~aiju@unaffiliated/aiju PRIVMSG #cat-v :branch_: a large part of modern human intelligence is learned through culture :)")
-(define test-zv ":zv-test!43a46046@gateway/web/freenode/ip.67.164.96.70 PRIVMSG #test-channel :<Maijin> adfasfaf")
