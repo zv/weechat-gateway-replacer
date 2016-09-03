@@ -19,7 +19,8 @@
 ;; brackets in the 2nd
 (define *gateway-regexps*
   (list
-    (make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(.*?)>) .*")           ; r2tg
+    (make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(.*?)>) .*")            ; r2tg
+    (make-regexp ":(slack-irc-bot)!\\S* PRIVMSG #\\S* :(<(.*?)>) .*")     ; slack-irc-bot
     (make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(.*?)>) .*"))) ; test
 
 (define (replace-privmsg msg)
