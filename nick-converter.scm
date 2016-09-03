@@ -18,13 +18,13 @@
 ;; the "real" username in the 3rd, and the real-username along with it's enclosing
 ;; brackets in the 2nd
 (define *gateway-regexps*
-  `((freenode . (
-                 ;; r2tg
-                 ,(make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(.*?)>) .*")
-                 ;;; slack-irc-bot
-                 ,(make-regexp ":(slack-irc-bot)!\\S* PRIVMSG #\\S* :(<(.*?)>) .*")
-                 ;;; test
-                 ,(make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(.*?)>) .*")))))
+  (alist->hash-table
+   `(("freenode" . (;; r2tg
+                    ,(make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(.*?)>) .*")
+                    ;; slack-irc-bot
+                    ,(make-regexp ":(slack-irc-bot)!\\S* PRIVMSG #\\S* :(<(.*?)>) .*")
+                    ;; test
+                    ,(make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(.*?)>) .*"))))))
 
 (define (replace-privmsg msg gateways)
   "A function to replace the privmsg sent by by a gateway "
@@ -47,10 +47,12 @@
           (string-append ":" real-username hostmask message))
         msg)))
 
+(define (server->gateways server)
+  (hash-ref *gateway-regexps* server))
+
 (define (privmsg-modifier data modifier-type server msg)
   ;; fetch the appropriate gateway by server
-  (let ((gateways (assq-ref *gateway-regexps*
-                            (string->symbol server))))
+  (let ((gateways (server->gateways server)))
     (if gateways
         (replace-privmsg msg gateways)
         msg)))
