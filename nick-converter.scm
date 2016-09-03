@@ -1,7 +1,9 @@
 (use-modules ((srfi srfi-1)
               #:select (any)))
-(use-modules (srfi srfi-26))
+(use-modules ((srfi srfi-26)
+              #:select (cut)))
 (use-modules (ice-9 regex))
+(use-modules (ice-9 hash-table))
 
 (if (defined? 'weechat:register)
     (begin
@@ -59,7 +61,3 @@
 
 (if (defined? 'weechat:hook_modifier)
     (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" ""))
-
-(define test-msg ":r2tg!~user@static.213-239-215-115.clients.your-server.de PRIVMSG #radare :<Maijin> Just build using ./sys/asan.sh and paste log caused by your issue")
-(define test-nonmsg ":aiju!~aiju@unaffiliated/aiju PRIVMSG #cat-v :branch_: a large part of modern human intelligence is learned through culture :)")
-(define test-zv ":zv-test!43a46046@gateway/web/freenode/ip.67.164.96.70 PRIVMSG #test-channel :<Maijin> adfasfaf")
