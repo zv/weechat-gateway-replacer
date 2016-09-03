@@ -18,15 +18,18 @@
 ;; the "real" username in the 3rd, and the real-username along with it's enclosing
 ;; brackets in the 2nd
 (define *gateway-regexps*
-  (list
-    (make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(.*?)>) .*")            ; r2tg
-    (make-regexp ":(slack-irc-bot)!\\S* PRIVMSG #\\S* :(<(.*?)>) .*")     ; slack-irc-bot
-    (make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(.*?)>) .*"))) ; test
+  `((freenode . (
+                 ;; r2tg
+                 ,(make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(.*?)>) .*")
+                 ;;; slack-irc-bot
+                 ,(make-regexp ":(slack-irc-bot)!\\S* PRIVMSG #\\S* :(<(.*?)>) .*")
+                 ;;; test
+                 ,(make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(.*?)>) .*")))))
 
-(define (replace-privmsg msg)
+(define (replace-privmsg msg gateways)
   "A function to replace the privmsg sent by by a gateway "
   (let* ((match? (cut regexp-exec <> msg))
-         (result (any match? *gateway-regexps*)))
+         (result (any match? gateways)))
     (if result
         (let* ([nth-match (cut match:substring result <>)]
                ;; take everything after username before message
@@ -45,12 +48,12 @@
         msg)))
 
 (define (privmsg-modifier data modifier-type server msg)
-  ;; everything we want is on freenode right now
-  (if (equal? server "freenode")
-      ;; keep it in a `let' block in case we want to do more processing
-      (let ((new-msg (replace-privmsg msg)))
-        new-msg)
-      msg))
+  ;; fetch the appropriate gateway by server
+  (let ((gateways (assq-ref *gateway-regexps*
+                            (string->symbol server))))
+    (if gateways
+        (replace-privmsg msg gateways)
+        msg)))
 
 (if (defined? 'weechat:hook_modifier)
     (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" ""))
