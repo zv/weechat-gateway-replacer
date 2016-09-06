@@ -52,6 +52,9 @@
 (define (server->gateways server)
   (hash-ref *gateway-regexps* server))
 
+(define (print . msgs)
+  (weechat:print "" (apply format (cons #f msgs))))
+
 (define (privmsg-modifier data modifier-type server msg)
   ;; fetch the appropriate gateway by server
   (let ((gateways (server->gateways server)))
