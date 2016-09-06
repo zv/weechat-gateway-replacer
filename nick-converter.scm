@@ -4,6 +4,7 @@
               #:select (cut)))
 (use-modules (ice-9 regex))
 (use-modules (ice-9 hash-table))
+(use-modules (ice-9 match))
 
 (if (defined? 'weechat:register)
     (begin
@@ -28,6 +29,31 @@
                     ;; test
                     ,(make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(\\S*?)>) .*"))))))
 
+(define (process-network-infolist)
+  "Convert the internal user-defined servername to the 'true' servername
+returned during /version"
+  (define il (weechat:infolist_get "irc_server" "" ""))
+
+  (define (extract-network result)
+    (if (null? result) #f
+        (match (string-split (car result) #\=)
+          [("NETWORK" network) network]
+          [_ (extract-network (cdr result))])))
+
+  (define (process return-code)
+    (if (= return-code 0) '()
+        (let* ((name (weechat:infolist_string il "name"))
+               (isupport (weechat:infolist_string il "isupport"))
+               (reply (string-split isupport #\space))
+               (network (extract-network reply)))
+          (cons
+           (cons name network)
+           (process (weechat:infolist_next il))))))
+
+  (process (weechat:infolist_next il)))
+
+(define *hostname-table* (alist->hash-table (process-network-infolist)))
+
 (define (replace-privmsg msg gateways)
   "A function to replace the privmsg sent by by a gateway "
   (let* ((match? (cut regexp-exec <> msg))
@@ -50,7 +76,8 @@
         msg)))
 
 (define (server->gateways server)
-  (hash-ref *gateway-regexps* server))
+  (hash-ref *gateway-regexps*
+             (hash-ref *hostname-table* server)))
 
 (define (print . msgs)
   (weechat:print "" (apply format (cons #f msgs))))
