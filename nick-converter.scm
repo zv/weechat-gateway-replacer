@@ -7,39 +7,44 @@
 (use-modules (ice-9 match))
 
 (if (defined? 'weechat:register)
-    (begin
-      (weechat:register "gateway-nickconverter"
+    (weechat:register "gateway-nickconverter"
                       "zv <zv@nxvr.org>"
                       "1.0"
                       "GPL3"
                       "Convert usernames of gateway connections their real names"
                       ""
-                      "")
-      (weechat:print "" "Initialize Gateway Nickconverter")))
+                      ""))
+
+(define (print . msgs)
+  (if (defined? 'weechat:print)
+      (weechat:print "" (apply format (cons #f msgs)))))
 
 ;; A regular expression must have the gateway username in the first matchgroup,
 ;; the "real" username in the 3rd, and the real-username along with it's enclosing
 ;; brackets in the 2nd
 (define *gateway-regexps*
   (alist->hash-table
-   `(("freenode" . (;; r2tg
-                    ,(make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(\\S*?)>) .*")
-                    ;; slack-irc-bot
-                    ,(make-regexp ":(slack-irc-bot)!\\S* PRIVMSG #\\S* :(<(\\S*?)>) .*")
-                    ;; test
-                    ,(make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(\\S*?)>) .*"))))))
+   `(("freenode" .
+      (;; r2tg
+       ,(make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(\\S*?)>) .*")
+       ;; slack-irc-bot
+       ,(make-regexp ":(slack-irc-bot)!\\S* PRIVMSG #\\S* :(<(\\S*?)>) .*")
+       ;; test
+       ,(make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(\\S*?)>) .*"))))))
 
 (define (process-network-infolist)
   "Convert the internal user-defined servername to the 'true' servername
 returned during /version"
   (define il (weechat:infolist_get "irc_server" "" ""))
 
+  ;; pull the network field out of the list of /VERSION results
   (define (extract-network result)
     (if (null? result) #f
         (match (string-split (car result) #\=)
           [("NETWORK" network) network]
           [_ (extract-network (cdr result))])))
 
+  ;; pull out a (name network-name) pair from an infolist str
   (define (process return-code)
     (if (= return-code 0) '()
         (let* ((name (weechat:infolist_string il "name"))
@@ -52,7 +57,8 @@ returned during /version"
 
   (process (weechat:infolist_next il)))
 
-(define *hostname-table* (alist->hash-table (process-network-infolist)))
+(define *hostname-table* (alist->hash-table
+                          (process-network-infolist)))
 
 (define (replace-privmsg msg gateways)
   "A function to replace the privmsg sent by by a gateway "
@@ -79,9 +85,6 @@ returned during /version"
   (hash-ref *gateway-regexps*
              (hash-ref *hostname-table* server)))
 
-(define (print . msgs)
-  (weechat:print "" (apply format (cons #f msgs))))
-
 (define (privmsg-modifier data modifier-type server msg)
   ;; fetch the appropriate gateway by server
   (let ((gateways (server->gateways server)))
@@ -91,3 +94,5 @@ returned during /version"
 
 (if (defined? 'weechat:hook_modifier)
     (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" ""))
+
+(print "" "Gateway Nickconverter by zv <zv@nxvr.org>")
