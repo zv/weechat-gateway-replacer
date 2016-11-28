@@ -15,6 +15,9 @@
                       ""
                       ""))
 
+;; `user-prefix' is a distinguishing username prefix for 'fake' users
+(define *user-prefix* "^")
+
 (define (print . msgs)
   (if (defined? 'weechat:print)
       (weechat:print "" (apply format (cons #f msgs)))))
@@ -28,7 +31,7 @@
       (;; r2tg
        ,(make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(\\S*?)>) .*")
        ;; slack-irc-bot
-       ,(make-regexp ":(slack-irc-bot)!\\S* PRIVMSG #\\S* :(<(\\S*?)>) .*")
+       ,(make-regexp ":(slack-irc-bot(1\\|2)?)!\\S* PRIVMSG #\\S* :(<(\\S*?)>) .*")
        ;; test
        ,(make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(\\S*?)>) .*"))))))
 
@@ -44,13 +47,15 @@ returned during /version"
           [("NETWORK" network) network]
           [_ (extract-network (cdr result))])))
 
-  ;; pull out a (name network-name) pair from an infolist str
+  ;; pull out a '(name network-name) pair from an infolist str
   (define (process return-code)
     (if (= return-code 0) '()
-        (let* ((name (weechat:infolist_string il "name"))
-               (isupport (weechat:infolist_string il "isupport"))
-               (reply (string-split isupport #\space))
-               (network (extract-network reply)))
+        (let* ((name      (weechat:infolist_string il "name"))
+               (isupport  (weechat:infolist_string il "isupport"))
+               (reply     (string-split isupport #\space))
+               (network   (or (extract-network reply)
+                              ;; if no network, use local name
+                              name)))
           (cons
            (cons name network)
            (process (weechat:infolist_next il))))))
@@ -78,7 +83,7 @@ returned during /version"
                [hostmask (string-copy msg
                                       (match:end result 1)
                                       (match:start result 2))])
-          (string-append ":" real-username hostmask message))
+          (string-append ":" *user-prefix* real-username hostmask message))
         msg)))
 
 (define (server->gateways server)

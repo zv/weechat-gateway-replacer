@@ -7,6 +7,8 @@
 
 (define test-zv ":zv-test!43a46046@gateway/web/freenode/ip.67.164.96.70 PRIVMSG #test-channel :<Maijin> adfasfaf")
 
+(define test-brackets ":r2tg!43a46046@gateway/web/freenode/ip.67.164.96.70 PRIVMSG #test-channel :<Maijin> ad< adfasdf >fasfaf")
+
 (test-begin "Tests")
 
 (test-begin "privmsg-modifier")

@@ -6,12 +6,14 @@ with the /true/ username prefixed to the message like so:
 r2tg | <oddcoder> the shellcoder handbook really goes without any discussion on how to setup the server to exploit it just said (setup up the server)
 #+END_EXAMPLE
 
-This is a weechat plugin that will let you modify the gateway messages with the
-real nick.
+This is a weechat plugin that will let you modify the gateway messages with the real nick.
 
 #+BEGIN_EXAMPLE
 oddcoder | the shellcoder handbook really goes without any discussion on how to setup the server to exploit it just said (setup up the server)
 #+END_EXAMPLE
+
+
+It comes with support for some widely seen gateways like =r2tg= and =slack-irc-gateway=
 
 ** Adding New Nicks
 This plugin doesn't expose any configuration details to weechat, if you'd like
