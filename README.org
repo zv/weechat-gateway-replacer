@@ -17,4 +17,4 @@ It comes with support for some widely seen gateways like =r2tg= and =slack-irc-g
 
 ** Adding New Nicks
 This plugin doesn't expose any configuration details to weechat, if you'd like
- to add another gateway<->nick matching pair, you can [[https://github.com/zv/weechat-gateway-replacer/blob/master/nick-converter.scm#L20-L23][add another regexp here]]
+ to add another gateway<->nick matching pair, you can [[https://github.com/zv/weechat-gateway-replacer/blob/master/nick-converter.scm#L27-L33][add another regexp here]]
