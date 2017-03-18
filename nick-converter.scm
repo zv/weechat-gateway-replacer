@@ -1,4 +1,23 @@
 ;; -*- geiser-scheme-implementation: 'guile -*-
+;; Copyright 2017 by Zephyr Pellerin <zv@nxvr.org>
+;; ------------------------------------------------------------
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation; either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;; History:
+;; 1.2 - Use weechat plugin configuration data to match IRC gateways
+;; 0.9 - Lookup correct servername in /VERSION
+;; 0.8 - Barebones, contained list of translations
 
 (use-modules ((srfi srfi-1)
               #:select (any)))
@@ -8,15 +27,25 @@
 (use-modules (ice-9 hash-table))
 (use-modules (ice-9 match))
 
+(define *weechat/script-name* "gateway_rename")
+(define *weechat/script-author* "zv <zv@nxvr.org>")
+(define *weechat/script-version* "1.2")
+(define *weechat/script-license* "GPL3")
+(define *weechat/script-description* "Convert usernames of gateway connections their real names")
+
 ;; A test-harness for checking if we are inside weechat
 (define-syntax if-weechat
   (syntax-rules ()
     ((_ conseq alt) (if (defined? 'weechat:register) conseq alt))
     ((_ conseq) (if (defined? 'weechat:register) conseq))))
 
-(if-weechat
- (weechat:register "gateway_nickconverter" "zv <zv@nxvr.org>" "1.0" "GPL3"
-                   "Convert usernames of gateway connections their real names" "" ""))
+(if (defined? 'weechat:register)
+ (weechat:register *weechat/script-name*
+                   *weechat/script-author*
+                   *weechat/script-version*
+                   *weechat/script-license*
+                   *weechat/script-description*
+                   "" ""))
 
 ;; `user-prefix' is a distinguishing username prefix for 'fake' users
 (define *user-prefix* "^")
@@ -186,6 +215,8 @@ $1 = (\"(freenode #radare r2tg <NICK>)\" \"(* * slack-irc-bot NICK:)\")
      gateways)))
 
 ;; Initialize our weechat settings & privmsg hook
+(define (renamer_command_cb data buffer args) weechat::WEECHAT_RC_OK)
+
 (if-weechat
  (begin
    (if (not (= 1 (weechat:config_is_set_plugin *gateway-config*)))
@@ -193,7 +224,45 @@ $1 = (\"(freenode #radare r2tg <NICK>)\" \"(* * slack-irc-bot NICK:)\")
         *gateway-config*
         *default-irc-gateways*))
 
-   (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" "")))
+   (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" "")
+
+   (weechat:hook_command *weechat/script-name*
+                         *weechat/script-description*
+                         "" ;; arguments
+                         "
+There are many IRC gateway programs that, rather than sending as if they were
+another user, simply prepend the name of the user that is using that gateway to
+the messages they are sending.
+
+For example: `slack-irc-bot` might send a message to #weechat:
+
+    slack-irc-bot: <zv> How about them Yankees?
+
+gateway_renamer intercepts that message and converts it to:
+
+    ^zv: How about them Yankees?
+
+(gateway_renamer prefixes the `^' (caret) symbol to each message to prevent message spoofing)
+
+Adding a Renamer:
+
+  Which servers, channels, users and nickname templates are renamed can all be
+  modified in `plugins.var.guile.gateway_rename.gateways'
+
+  Two gateways are matched by default, but are primarily intended to serve as a
+  template for you to add others.
+
+  Each gateway renamer is placed inside of a set of parenthesis and contain four fields respectively:
+  1. IRC server name (use the same name that weechat uses)
+  2. Channel
+  3. Gateway's nick/user name
+  4. The last field is a template for how to match the nickname of the 'real user'
+     For example, if you wanted to convert the message 'gateway-bot: zv: Yes' into 'zv: Yes'
+     You would set the last field to 'NICK:' because each NICK at the beginning of the message is suffixed with a `:'
+                         "
+                         ""
+                         "renamer_command_cb"
+                         "")))
 
 ;; Setup our gateways->regex map
 (assign-gateways-regex)
