@@ -8,18 +8,20 @@
 (use-modules (ice-9 hash-table))
 (use-modules (ice-9 match))
 
-(if (defined? 'weechat:register)
-    (weechat:register "gateway_nickconverter"
-                      "zv <zv@nxvr.org>"
-                      "1.0"
-                      "GPL3"
-                      "Convert usernames of gateway connections their real names"
-                      ""
-                      ""))
+;; A test-harness for checking if we are inside weechat
+(define-syntax if-weechat
+  (syntax-rules ()
+    ((_ conseq alt) (if (defined? 'weechat:register) conseq alt))
+    ((_ conseq) (if (defined? 'weechat:register) conseq))))
+
+(if-weechat
+ (weechat:register "gateway_nickconverter" "zv <zv@nxvr.org>" "1.0" "GPL3"
+                   "Convert usernames of gateway connections their real names" "" ""))
 
 ;; `user-prefix' is a distinguishing username prefix for 'fake' users
 (define *user-prefix* "^")
 (define *gateway-config* "gateways")
+(define *default-irc-gateways* "(freenode #radare r2tg <NICK>)(freenode #test-channel zv-test <NICK>)")
 
 (define (print . msgs)
   (if (defined? 'weechat:print)
@@ -57,10 +59,13 @@ returned during /version"
 
   (process (weechat:infolist_next il)))
 
-(define *hostname-table* (alist->hash-table (process-network-infolist)))
+;; This is a table that maps a weechat network 'name' to it's IRC-style hostname
+(define *hostname-table* (alist->hash-table '(("freenode" . "freenode"))))
+(if-weechat
+ (set! *hostname-table* (alist->hash-table (process-network-infolist))))
 
 (define (replace-privmsg msg gateways)
-  "A function to replace the privmsg sent by by a gateway "
+  "A function to replace the PRIVMSG sent by by a gateway "
   (let* ((match? (cut regexp-exec <> msg))
          (result (any match? gateways)))
     (if result
@@ -84,86 +89,86 @@ returned during /version"
   (hash-ref *gateway-regexps* (hash-ref *hostname-table* server)))
 
 (define (privmsg-modifier data modifier-type server msg)
-  ;; fetch the appropriate gateway by server
+  "The hook for all PRIVMSGs in Weechat"
   (let ((gateways (server->gateways server)))
     (if gateways
         (replace-privmsg msg gateways)
         msg)))
 
-(define (process-weechat-option opt)
+(define* (make-gateway-regexp gateway-nick channel mask #:optional emit-string)
+  "Build a regular expression that will match the nick, channel and \"<NICK>\"-style mask"
+  (let* ([mask-regexp ;; replace <NICK> with <(\\S*?)>
+          (regexp-substitute/global #f "NICK" mask 'pre "(\\S*?)" 'post "")]
+         [composed-str (format #f ":(~a)!\\S* PRIVMSG ~a :(~a)" gateway-nick channel mask-regexp)])
+    (if emit-string composed-str (make-regexp composed-str))))
+
+(define (extract-gateway-fields str)
+  "This is a hack around Guile's non-greedy matchers.
+
+  # Example
+  scheme@(guile-user)> (extract-gateway-fields \"(freenode #radare r2tg <NICK>)\")
+  $1 = (\"freenode\" \"#radare\" \"r2tg\" \"<NICK>\")"
+  (let* ((range-end  (λ (range) (+ 1 (cdr range))))
+         (find-space (λ (end) (string-index str #\space end)))
+         ;; opening (first) and closing (last) parenthesis
+         (opening-par   (string-index str #\())
+         (closing-par   (string-index str #\)))
+         ;; extract the range of each
+         (server        (cons (+ 1 opening-par) (find-space 0)))
+         (channel       (cons (range-end server) (find-space (range-end server))))
+         (gateway-nick  (cons (range-end channel) (find-space (range-end channel))))
+         (mask          (cons (range-end gateway-nick) closing-par)))
+
+    ;; and then get the strings
+    (map (λ (window) (substring str (car window) (cdr window)))
+         (list server channel gateway-nick mask))))
+
+(define* (process-weechat-option opt #:optional emit-string)
   "Takes in the application-define weechat-options and emits a server and
 matching regular expression.
+
+The optional parameter `emit-string' controls if a string or a compiled regular
+expression is returned.
 
 # Example
 
 scheme@(guile-user)> (process-weechat-option \"(freenode #radare r2tg <NICK>)\")
 $1 = '(\"freenode\" . (make-regexp \":(r2tg)!\\S* PRIVMSG #radare :(<(\\S*?)>) .*\")))"
-
-  (define (make-gateway-regexp gateway-nick channel mask)
-    "Build a regular expression that will match the nick, channel and \"<NICK>\"-style mask"
-    (let ((mask-regexp ;; replace <NICK> with <(\\S*?)>
-           (regexp-substitute/global #f "NICK" mask 'pre "(\\S*?)" 'post "")))
-      (make-regexp (format #f ":(~a)!\\S* PRIVMSG ~a :(~a)" gateway-nick channel mask-regexp))))
-
-  (define (extract-fields str)
-    "Guile's regex engine doesn't support non-greedy matchers (wtf?), so I had
-to write this.
-
-# Example
-scheme@(guile-user)> (extract-fields \"(freenode #radare r2tg <NICK>)\")
-$1 = (\"freenode\" \"#radare\" \"r2tg\" \"<NICK>\")
-"
-    (let* ((range-end  (λ (range) (+ 1 (cdr range))))
-           (find-space (λ (end) (string-index str #\space end)))
-           ;; opening (first) and closing (last) parenthesis
-           (opening-par   (string-index str #\())
-           (closing-par   (string-index str #\)))
-           ;; extract the range of each
-           (server        (cons (+ 1 opening-par) (find-space 0)))
-           (channel       (cons (range-end server) (find-space (range-end server))))
-           (gateway-nick  (cons (range-end channel) (find-space (range-end channel))))
-           (mask          (cons (range-end gateway-nick) closing-par)))
-
-      ;; and then get the strings
-      (map (λ (window) (substring str (car window) (cdr window)))
-           (list server channel gateway-nick mask))))
-
-
-  (let* ((fields (extract-fields opt))
+  (let* ((fields (extract-gateway-fields opt))
          (server  (list-ref fields 0))
          (channel (list-ref fields 1))
          (gateway-nick (list-ref fields 2))
          (mask    (list-ref fields 3)))
-    (cons server (make-gateway-regexp gateway-nick channel mask))))
+    (cons server (make-gateway-regexp gateway-nick channel mask emit-string))))
+
 
 (define (split-gateways config)
   "Push our elts onto the stack to extract our configs
 
 # Example
-scheme@(guile-user)> (gateways-config->regex \"(freenode #radare r2tg <NICK>)(* * slack-irc-bot NICK:)\")
+scheme@(guile-user)> (split-gateways \"(freenode #radare r2tg <NICK>)(* * slack-irc-bot NICK:)\")
 $1 = (\"(freenode #radare r2tg <NICK>)\" \"(* * slack-irc-bot NICK:)\")
 "
-  (define (loop stk current rest)
+  (define (process stk current rest)
     (if (string-null? rest) (cons current '())
         (let* ((head (string-ref rest 0))
                (nrest (string-drop rest 1))
                (ncurrent (string-append current (string head))))
           (cond
            [(and (null? stk) (not (string-null? current)))
-            (cons current (loop stk "" rest))]
-           [(eq? head #\() (loop (cons #\( stk) ncurrent nrest)]
-           [(eq? head #\)) (loop (cdr stk) ncurrent nrest)]
+            (cons current (process stk "" rest))]
+           [(eq? head #\() (process (cons #\( stk) ncurrent nrest)]
+           [(eq? head #\)) (process (cdr stk) ncurrent nrest)]
            ;; skip characters if our stk is empty
-           [(null? stk) (loop stk current nrest)]
-           [else (loop stk ncurrent nrest)]))))
+           [(null? stk) (process stk current nrest)]
+           [else (process stk ncurrent nrest)]))))
 
-  (loop '() "" config))
+  (process '() "" config))
 
 (define (fetch-weechat-gateway-config)
-  (if (defined? 'weechat:config_get_plugin)
-      (weechat:config_get_plugin *gateway-config*)
-      ;; a test string
-      "(freenode #radare r2tg <NICK>)(freenode #test-channel zv-test <NICK>)"))
+  "Extract the gateway configuration string"
+  (if-weechat (weechat:config_get_plugin *gateway-config*)
+              *default-irc-gateways*))
 
 (define (assign-gateways-regex)
   "Fetch our weechat gateway configuration and assign it to our local regexps"
@@ -177,17 +182,20 @@ $1 = (\"(freenode #radare r2tg <NICK>)\" \"(* * slack-irc-bot NICK:)\")
               (new-regex (cdr gt))
               (server-regexps (hash-ref *gateway-regexps* server '())))
          (hash-set! *gateway-regexps* server
-                     (cons new-regex server-regexps))))
+                    (cons new-regex server-regexps))))
      gateways)))
 
-;; Initialize our settings
-(if (not (= 1 (weechat:config_is_set_plugin *gateway-config*)))
-    (weechat:config_set_plugin
-     *gateway-config*
-     "(freenode #radare r2tg <NICK>)(freenode #test-channel zv-test <NICK>)"))
+;; Initialize our weechat settings & privmsg hook
+(if-weechat
+ (begin
+   (if (not (= 1 (weechat:config_is_set_plugin *gateway-config*)))
+       (weechat:config_set_plugin
+        *gateway-config*
+        *default-irc-gateways*))
 
+   (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" "")))
+
+;; Setup our gateways->regex map
 (assign-gateways-regex)
 
-(weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" "")
 (print "Gateway Nickconverter by zv <zv@nxvr.org>")
-
