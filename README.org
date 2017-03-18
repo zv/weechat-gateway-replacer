@@ -3,19 +3,19 @@ There are many IRC gateway programs that, rather than sending as if they were
 another user, simply prepend the name of the user that is using that gateway to
 the messages they are sending.
 
-For example: `slack-irc-bot` might send a message to #weechat:
+For example: ~slack-irc-bot~ might send a message to =#weechat=:
 
-    slack-irc-bot: <zv> How about them Yankees?
+    =slack-irc-bot: <zv> How about them Yankees?=
 
 gateway_rename intercepts that message and converts it to:
 
-    ^zv: How about them Yankees?
+    =^zv: How about them Yankees?=
 
-(gateway_rename prefixes the `^' (caret) symbol to each message to prevent message spoofing)
+(gateway_rename prefixes the =^= (caret) symbol to each message to prevent message spoofing)
 
 ** Adding a Renamer:
   Which servers, channels, users and nickname templates are renamed can all be
-  modified in `plugins.var.guile.gateway_rename.gateways'
+  modified in =plugins.var.guile.gateway_rename.gateways=
 
   Two gateways are matched by default, but are primarily intended to serve as a
   template for you to add others.
@@ -25,5 +25,6 @@ gateway_rename intercepts that message and converts it to:
   2. Channel
   3. Gateway's nick/user name
   4. The last field is a template for how to match the nickname of the 'real user'
-     For example, if you wanted to convert the message 'gateway-bot: zv: Yes' into 'zv: Yes'
-     You would set the last field to 'NICK:' because each NICK at the beginning of the message is suffixed with a `:'
+     For example, if you wanted to convert the message =gateway-bot: zv: Yes= into =zv: Yes=
+     You would set the last field to =NICK:= because each nick at the beginning
+     of the message is suffixed with a ~:~
