@@ -1,20 +1,29 @@
 * Gateway Nick Converter
-Telegram, Slack and other IRC gateways frequently send under single user name that
-with the /true/ username prefixed to the message like so:
+There are many IRC gateway programs that, rather than sending as if they were
+another user, simply prepend the name of the user that is using that gateway to
+the messages they are sending.
 
-#+BEGIN_EXAMPLE
-r2tg | <oddcoder> the shellcoder handbook really goes without any discussion on how to setup the server to exploit it just said (setup up the server)
-#+END_EXAMPLE
+For example: `slack-irc-bot` might send a message to #weechat:
 
-This is a weechat plugin that will let you modify the gateway messages with the real nick.
+    slack-irc-bot: <zv> How about them Yankees?
 
-#+BEGIN_EXAMPLE
-oddcoder | the shellcoder handbook really goes without any discussion on how to setup the server to exploit it just said (setup up the server)
-#+END_EXAMPLE
+gateway_rename intercepts that message and converts it to:
 
+    ^zv: How about them Yankees?
 
-It comes with support for some widely seen gateways like =r2tg= and =slack-irc-gateway=
+(gateway_rename prefixes the `^' (caret) symbol to each message to prevent message spoofing)
 
-** Adding New Nicks
-This plugin doesn't expose any configuration details to weechat, if you'd like
- to add another gateway<->nick matching pair, you can [[https://github.com/zv/weechat-gateway-replacer/blob/master/nick-converter.scm#L27-L33][add another regexp here]]
+** Adding a Renamer:
+  Which servers, channels, users and nickname templates are renamed can all be
+  modified in `plugins.var.guile.gateway_rename.gateways'
+
+  Two gateways are matched by default, but are primarily intended to serve as a
+  template for you to add others.
+
+  Each gateway renamer is placed inside of a set of parenthesis and contain four fields respectively:
+  1. IRC server name (use the same name that weechat uses)
+  2. Channel
+  3. Gateway's nick/user name
+  4. The last field is a template for how to match the nickname of the 'real user'
+     For example, if you wanted to convert the message 'gateway-bot: zv: Yes' into 'zv: Yes'
+     You would set the last field to 'NICK:' because each NICK at the beginning of the message is suffixed with a `:'
