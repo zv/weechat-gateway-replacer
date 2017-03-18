@@ -1,3 +1,5 @@
+;; -*- geiser-scheme-implementation: 'guile -*-
+
 (use-modules ((srfi srfi-1)
               #:select (any)))
 (use-modules ((srfi srfi-26)
