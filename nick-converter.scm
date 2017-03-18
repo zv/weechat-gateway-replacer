@@ -9,7 +9,7 @@
 (use-modules (ice-9 match))
 
 (if (defined? 'weechat:register)
-    (weechat:register "gateway-nickconverter"
+    (weechat:register "gateway_nickconverter"
                       "zv <zv@nxvr.org>"
                       "1.0"
                       "GPL3"
@@ -19,6 +19,7 @@
 
 ;; `user-prefix' is a distinguishing username prefix for 'fake' users
 (define *user-prefix* "^")
+(define *gateway-config* "gateways")
 
 (define (print . msgs)
   (if (defined? 'weechat:print)
@@ -27,15 +28,7 @@
 ;; A regular expression must have the gateway username in the first matchgroup,
 ;; the "real" username in the 3rd, and the real-username along with it's enclosing
 ;; brackets in the 2nd
-(define *gateway-regexps*
-  (alist->hash-table
-   `(("freenode" .
-      (;; r2tg
-       ,(make-regexp ":(r2tg)!\\S* PRIVMSG #radare :(<(\\S*?)>) .*")
-       ;; slack-irc-bot
-       ,(make-regexp ":(slack-irc-bot(1\\|2)?)!\\S* PRIVMSG #\\S* :(<(\\S*?)>) .*")
-       ;; test
-       ,(make-regexp ":(zv-test)!\\S* PRIVMSG #test-channel :(<(\\S*?)>) .*"))))))
+(define *gateway-regexps* (make-hash-table))
 
 (define (process-network-infolist)
   "Convert the internal user-defined servername to the 'true' servername
@@ -64,8 +57,7 @@ returned during /version"
 
   (process (weechat:infolist_next il)))
 
-(define *hostname-table* (alist->hash-table
-                          (process-network-infolist)))
+(define *hostname-table* (alist->hash-table (process-network-infolist)))
 
 (define (replace-privmsg msg gateways)
   "A function to replace the privmsg sent by by a gateway "
@@ -89,8 +81,7 @@ returned during /version"
         msg)))
 
 (define (server->gateways server)
-  (hash-ref *gateway-regexps*
-             (hash-ref *hostname-table* server)))
+  (hash-ref *gateway-regexps* (hash-ref *hostname-table* server)))
 
 (define (privmsg-modifier data modifier-type server msg)
   ;; fetch the appropriate gateway by server
@@ -101,5 +92,11 @@ returned during /version"
 
 (if (defined? 'weechat:hook_modifier)
     (weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" ""))
+;; Initialize our settings
+(if (not (= 1 (weechat:config_is_set_plugin *gateway-config*)))
+    (weechat:config_set_plugin
+     *gateway-config*
+     "(freenode #radare r2tg <NICK>)(freenode #test-channel zv-test <NICK>)"))
+(weechat:hook_modifier "irc_in_privmsg" "privmsg-modifier" "")
+(print "Gateway Nickconverter by zv <zv@nxvr.org>")
 
-(print "" "Gateway Nickconverter by zv <zv@nxvr.org>")
